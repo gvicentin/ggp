@@ -2,6 +2,8 @@
 
 Compile and run a simple hello world game using WebAssembly.
 
+Ref: https://ebitengine.org/en/documents/webassembly.html
+
 ## Compile
 
 ```bash
@@ -12,7 +14,7 @@ This will generate a `helloworld.wasm` file.
 
 ## Copy the wasm_exec.js file
 
-The wasm_exec.js file is needed to run the WebAssembly code. It is located in the Go installation directory.
+The `wasm_exec.js` file is needed to run the WebAssembly code. It is located in the Go installation directory.
 
 ```bash
 cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" .
