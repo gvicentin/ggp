@@ -97,7 +97,7 @@ func main() {
 	game.init()
 
 	ebiten.SetWindowSize(screenWidth, screenHeight)
-	ebiten.SetWindowTitle("Render an image")
+	ebiten.SetWindowTitle(screenTitle)
 
 	if err := ebiten.RunGame(game); err != nil {
 		log.Fatal(err)
