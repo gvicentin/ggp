@@ -1,13 +1,16 @@
 package main
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"log"
 	"math/rand"
+	"os"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
 const (
@@ -39,6 +42,8 @@ const (
 	coinSpawnXMax = screenWidth
 
 	coinStartCooldown = 1.5
+
+	livesScale = 2
 )
 
 type coin struct {
@@ -47,7 +52,7 @@ type coin struct {
 }
 
 func (c *coin) spawn() {
-	c.x = float64(rand.Intn(coinSpawnXMax-coinWidth))
+	c.x = float64(rand.Intn(coinSpawnXMax - coinWidth))
 	c.y = coinSpawnY
 }
 
@@ -60,6 +65,8 @@ type Game struct {
 	groundImage *ebiten.Image
 	gopherImage *ebiten.Image
 	coinImage   *ebiten.Image
+	livesImage  *ebiten.Image
+	font        *text.GoTextFaceSource
 
 	// Gopher
 	gopherX, gopherY  float64
@@ -68,6 +75,10 @@ type Game struct {
 	// Coins
 	coins        [maxCoins]coin
 	coinCooldown float64
+
+	// Game state
+	score int
+	lives int
 }
 
 func (g *Game) Init() error {
@@ -91,14 +102,41 @@ func (g *Game) Init() error {
 
 	g.coinImage = coinImage
 
+	gopherImageRect := image.Rect(0, 0, gopherPixelsWidth, gopherPixelsHeight)
+	g.livesImage = g.gopherImage.SubImage(gopherImageRect).(*ebiten.Image)
+
+	// Font
+	file, err := os.Open("pressstart2p.ttf")
+	if err != nil {
+		return err
+	}
+
+	font, err := text.NewGoTextFaceSource(file)
+	if err != nil {
+		return err
+	}
+
+	g.font = font
+
+	g.reset()
+
+	return nil
+}
+
+func (g *Game) reset() {
+	g.gopherX = screenWidth / 2
+	g.gopherY = groundY - gopherHeight
+
 	for i := 0; i < maxCoins; i++ {
+		g.coins[i].active = false
 		g.coins[i].spawn()
 	}
 
 	g.coins[0].active = true
 	g.coinCooldown = coinStartCooldown
 
-	return nil
+	g.score = 0
+	g.lives = 3
 }
 
 func (g *Game) Update() error {
@@ -139,7 +177,13 @@ func (g *Game) Update() error {
 
 		if g.coins[i].y > screenHeight {
 			g.coins[i].active = false
+			g.lives--
 		}
+	}
+
+	if g.lives < 0 {
+		g.reset()
+		return nil
 	}
 
 	g.coinCooldown -= dt
@@ -169,6 +213,7 @@ func (g *Game) Update() error {
 
 		if testCollision(g.gopherX, groundY-gopherHeight, gopherWidth, gopherHeight, g.coins[i].x, g.coins[i].y, coinWidth, coinHeight) {
 			g.coins[i].active = false
+			g.score++
 		}
 	}
 
@@ -176,7 +221,7 @@ func (g *Game) Update() error {
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
-	screen.Fill(color.RGBA{0xfa, 0xfa, 0xfa, 0xff})
+	screen.Fill(color.RGBA{0x80, 0xa0, 0xc0, 0xff})
 
 	// Draw ground
 	groundOpts := ebiten.DrawImageOptions{}
@@ -208,6 +253,23 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		coinOpts := ebiten.DrawImageOptions{}
 		coinOpts.GeoM.Translate(g.coins[i].x, g.coins[i].y)
 		screen.DrawImage(g.coinImage, &coinOpts)
+	}
+
+	// Score
+	scoreTextOpts := &text.DrawOptions{}
+	scoreTextOpts.GeoM.Translate(10, 10)
+	text.Draw(screen, fmt.Sprintf("%03d", g.score), &text.GoTextFace{
+		Source: g.font,
+		Size:   24,
+	}, scoreTextOpts)
+
+	// Lives
+	for i := 0; i < g.lives; i++ {
+		x := screenWidth - (i+1)*(gopherPixelsWidth*livesScale) - 10
+		liveImgOpts := ebiten.DrawImageOptions{}
+		liveImgOpts.GeoM.Scale(livesScale, livesScale)
+		liveImgOpts.GeoM.Translate(float64(x), 10)
+		screen.DrawImage(g.livesImage, &liveImgOpts)
 	}
 }
 
