@@ -10,6 +10,7 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
@@ -60,6 +61,14 @@ func testCollision(x1, y1, w1, h1, x2, y2, w2, h2 float64) bool {
 	return x1 < x2+w2 && x2 < x1+w1 && y1 < y2+h2 && y2 < y1+h1
 }
 
+type GameMode int
+
+const (
+	GameModeTitle = iota
+	GameModeGame
+	GameModeGameOver
+)
+
 type Game struct {
 	// Graphics
 	groundImage *ebiten.Image
@@ -77,6 +86,7 @@ type Game struct {
 	coinCooldown float64
 
 	// Game state
+	mode  GameMode
 	score int
 	lives int
 }
@@ -119,6 +129,7 @@ func (g *Game) Init() error {
 	g.font = font
 
 	g.reset()
+	g.mode = GameModeTitle
 
 	return nil
 }
@@ -135,14 +146,32 @@ func (g *Game) reset() {
 	g.coins[0].active = true
 	g.coinCooldown = coinStartCooldown
 
+	g.mode = GameModeGame
 	g.score = 0
 	g.lives = 3
 }
 
 func (g *Game) Update() error {
-	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
 		// Quit the game when escape is pressed
 		return ebiten.Termination
+	}
+
+	if g.mode == GameModeTitle {
+		if inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
+			g.reset()
+		}
+
+		return nil
+	}
+
+	if g.mode == GameModeGameOver {
+		if inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
+			g.reset()
+			g.mode = GameModeTitle
+		}
+
+		return nil
 	}
 
 	var x float64
@@ -182,7 +211,7 @@ func (g *Game) Update() error {
 	}
 
 	if g.lives < 0 {
-		g.reset()
+		g.mode = GameModeGameOver
 		return nil
 	}
 
@@ -245,14 +274,16 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	screen.DrawImage(gopherImage, &gopherOpts)
 
 	// Coin
-	for i := 0; i < maxCoins; i++ {
-		if !g.coins[i].active {
-			continue
-		}
+	if g.mode != GameModeGameOver {
+		for i := 0; i < maxCoins; i++ {
+			if !g.coins[i].active {
+				continue
+			}
 
-		coinOpts := ebiten.DrawImageOptions{}
-		coinOpts.GeoM.Translate(g.coins[i].x, g.coins[i].y)
-		screen.DrawImage(g.coinImage, &coinOpts)
+			coinOpts := ebiten.DrawImageOptions{}
+			coinOpts.GeoM.Translate(g.coins[i].x, g.coins[i].y)
+			screen.DrawImage(g.coinImage, &coinOpts)
+		}
 	}
 
 	// Score
@@ -270,6 +301,34 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		liveImgOpts.GeoM.Scale(livesScale, livesScale)
 		liveImgOpts.GeoM.Translate(float64(x), 10)
 		screen.DrawImage(g.livesImage, &liveImgOpts)
+	}
+
+	if g.mode == GameModeTitle {
+		titleTextOpts := &text.DrawOptions{}
+		titleTextOpts.GeoM.Translate(screenWidth/2, 100)
+		titleTextOpts.PrimaryAlign = text.AlignCenter
+		text.Draw(screen, "GOPHER RAIN", &text.GoTextFace{
+			Source: g.font,
+			Size:   24,
+		}, titleTextOpts)
+
+		startTextOpts := &text.DrawOptions{}
+		startTextOpts.GeoM.Translate(screenWidth/2, 200)
+		startTextOpts.PrimaryAlign = text.AlignCenter
+		text.Draw(screen, "Press Enter to start", &text.GoTextFace{
+			Source: g.font,
+			Size:   24,
+		}, startTextOpts)
+	}
+
+	if g.mode == GameModeGameOver {
+		gameOverTextOpts := &text.DrawOptions{}
+		gameOverTextOpts.GeoM.Translate(screenWidth/2, 100)
+		gameOverTextOpts.PrimaryAlign = text.AlignCenter
+		text.Draw(screen, "GAME OVER", &text.GoTextFace{
+			Source: g.font,
+			Size:   24,
+		}, gameOverTextOpts)
 	}
 }
 
